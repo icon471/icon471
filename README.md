@@ -1,5 +1,5 @@
-# Nikson471 – AI OSINT & Pentest Suite 2025
-
-## Install full:
-```bash
-curl -fsSL https://raw.githubusercontent.com/icon471/nikson471/main/nikson471-full-installer.sh | bash
+git init
+git remote add origin https://github.com/icon471/nikson471.git
+git add .
+git commit -m "Upload installer OSINT 2025"
+git push -u origin main
