@@ -1,107 +1,126 @@
 #!/bin/bash
 
-echo -e "\n🛡️ [ Nikson471 - AI OSINT & Pentest Installer 2025 ]"
-echo "📦 Memulai instalasi semua dependensi dan tool..."
+echo -e "\n🛡️ [ Nikson471 - Full AI OSINT & Pentest Installer 2025 ]"
+echo "📦 Menyiapkan instalasi semua komponen..."
 
-# --- 1. SYSTEM UPDATE ---
+# Deteksi sistem
 if command -v apt >/dev/null 2>&1; then
   sudo apt update && sudo apt upgrade -y
+  sudo apt install -y python3 python3-pip git curl wget unzip golang \
+  netcat sqlmap hydra nmap exploitdb hashcat gobuster nikto \
+  john aircrack-ng wireshark metasploit-framework set beef-xss \
+  burpsuite maltego
 else
   pkg update -y && pkg upgrade -y
+  pkg install python git curl wget -y
+  echo "⚠️ Beberapa tools hanya bisa optimal di Kali Linux / Nethunter"
 fi
 
-# --- 2. DEPENDENSI DASAR ---
-sudo apt install -y python3 python3-pip git curl wget unzip \
-golang netcat sqlmap hydra nmap exploitdb hashcat gobuster \
-nikto john aircrack-ng wireshark metasploit-framework \
-set beef-xss burpsuite maltego
+# Python packages
+pip install --upgrade pip
+pip install openai requests rich gradio
 
-# --- 3. PIP PACKAGE ---
-pip3 install openai requests rich
-
-# --- 4. FOLDER & FILE NIKSON471 ---
+# Setup direktori
 mkdir -p ~/Nikson471 && cd ~/Nikson471
 
+# Download CLI script
 cat << 'EOF' > nikson471.py
 #!/usr/bin/env python3
-
 import openai, requests, os
 from rich.console import Console
 from rich.prompt import Prompt
-from datetime import datetime
 
 console = Console()
 
 def check_api_key():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        console.print("[bold red]❌ OPENAI_API_KEY belum ditemukan.[/bold red]")
+        console.print("[red]❌ OPENAI_API_KEY belum ditemukan.[/red]")
         api_key = Prompt.ask("🔐 Masukkan OpenAI API Key kamu")
         os.environ["OPENAI_API_KEY"] = api_key
-    openai.api_key = os.getenv("OPENAI_API_KEY")
+    openai.api_key = os.environ["OPENAI_API_KEY"]
 
 def run_recon(domain):
-    console.print(f"[bold cyan]🔎 Melakukan recon pada: {domain}[/bold cyan]")
-    result = ""
-
+    console.print(f"[cyan]🔍 Scanning: {domain}[/cyan]")
+    hasil = ""
     try:
-        sub_api = f"https://api.hackertarget.com/hostsearch/?q={domain}"
-        sub_resp = requests.get(sub_api).text
-        result += f"[Subdomain Info]\n{sub_resp}\n\n"
-
+        sub = requests.get(f"https://api.hackertarget.com/hostsearch/?q={domain}").text
+        hasil += f"[Subdomain]\n{sub}\n"
         headers = requests.get(f"https://{domain}", timeout=5).headers
-        result += "[Headers]\n"
-        for k, v in headers.items():
-            result += f"{k}: {v}\n"
+        hasil += "[Headers]\n" + "\n".join([f"{k}: {v}" for k,v in headers.items()])
     except:
-        result += "⚠️ Gagal mengambil data awal.\n"
+        hasil += "Gagal koneksi ke target."
 
-    console.print("[bold yellow]🤖 Mengirim hasil ke AI...[/bold yellow]")
-    gpt_prompt = f"""Kamu adalah AI pentester. Ini hasil recon dari domain {domain}:\n{result}\nApa potensi kerentanannya dan langkah lanjut yang bisa dilakukan?"""
-
+    prompt = f"Hasil recon untuk {domain}:\n{hasil}\nAnalisa potensi kerentanan:"
     try:
-        chat = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "Kamu adalah asisten cybersecurity profesional."},
-                {"role": "user", "content": gpt_prompt}
-            ]
+        res = openai.ChatCompletion.create(model="gpt-3.5-turbo",
+            messages=[{"role": "system", "content": "Kamu AI cybersecurity."},
+                      {"role": "user", "content": prompt}]
         )
-        ai_response = chat.choices[0].message.content
-        console.print("\n[bold green]💡 Analisa AI dari Nikson471:[/bold green]\n")
-        console.print(ai_response)
+        console.print("\n[green]💡 Hasil AI:[/green]")
+        console.print(res.choices[0].message.content)
     except Exception as e:
-        console.print(f"[red]❌ Gagal kirim ke AI: {e}[/red]")
+        console.print(f"[red]Error GPT: {e}[/red]")
 
 if __name__ == "__main__":
     check_api_key()
-    domain = Prompt.ask("🌐 Masukkan domain target")
-    run_recon(domain)
+    target = Prompt.ask("🌐 Masukkan domain target")
+    run_recon(target)
 EOF
 
-chmod +x nikson471.py
+# Download GUI script
+cat << 'EOF' > nikson471_gui.py
+#!/usr/bin/env python3
+import gradio as gr, openai, os, requests
 
-# --- 5. INFO TOOLS YANG DIINSTALL ---
+def recon_ai(domain, api_key):
+    openai.api_key = api_key
+    hasil = ""
+    try:
+        sub = requests.get(f"https://api.hackertarget.com/hostsearch/?q={domain}").text
+        hasil += f"[Subdomain Info]\n{sub}\n"
+        headers = requests.get(f"https://{domain}", timeout=5).headers
+        hasil += "[Headers]\n" + "\n".join([f"{k}: {v}" for k,v in headers.items()])
+    except:
+        hasil += "Gagal fetch info.\n"
+
+    prompt = f"Recon untuk domain {domain}:\n{hasil}\nBerikan analisis:"
+    try:
+        res = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "system", "content": "Kamu adalah AI cybersecurity"},
+                      {"role": "user", "content": prompt}]
+        )
+        return res.choices[0].message.content
+    except Exception as e:
+        return f"Gagal AI: {e}"
+
+gr.Interface(fn=recon_ai,
+             inputs=["text", "text"],
+             outputs="text",
+             title="Nikson471 - AI OSINT WebUI",
+             description="Masukkan domain dan API Key OpenAI").launch()
+EOF
+
+chmod +x nikson471.py nikson471_gui.py
+
+# Info
 cat << EOF
 
-🎉 [INSTALASI SELESAI]
+✅ Instalasi Selesai: Nikson471 - AI OSINT & Pentest 2025
 
-✅ Tools berhasil diinstall:
-• Netcat            • Metasploit
-• Maltego           • BeEF
-• SET               • Hydra
-• SQLmap            • Nikto
-• SearchSploit      • Gobuster
-• Hashcat           • John The Ripper
-• Nmap              • Aircrack-ng
-• Burp Suite        • Wireshark
-• Exploit-DB
+🧠 Jalankan CLI:
+  cd ~/Nikson471 && python3 nikson471.py
 
-🤖 Nikson471 AI Recon CLI:
-  Jalankan:  cd ~/Nikson471 && python3 nikson471.py
+🌐 Jalankan GUI WebUI:
+  cd ~/Nikson471 && python3 nikson471_gui.py
+  (Akan terbuka di browser lokal: http://127.0.0.1:7860)
 
-📌 Tips:
-  - Pastikan API Key dari OpenAI aktif (https://platform.openai.com/account/api-keys)
-  - Gunakan domain target seperti: example.com, target.site, dsb
+📦 Tools yang telah terinstall:
+- Netcat, Maltego, SET, Metasploit, BeEF, BurpSuite, Wireshark
+- SQLmap, Hashcat, Gobuster, Nikto, Hydra, John the Ripper
+- Nmap, Aircrack-ng, SearchSploit, Exploit-DB, dll
+
+🔐 Pastikan OpenAI API Key tersedia: https://platform.openai.com/account/api-keys
 
 EOF
