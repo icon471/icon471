@@ -1,0 +1,96 @@
+#!/bin/bash
+set -e
+
+echo -e "\n🛡️ Nikson471 - AI OSINT & Pentest Suite 2025"
+
+# 1. Update & Install utama
+if command -v apt >/dev/null; then
+  sudo apt update && sudo apt upgrade -y
+  sudo apt install -y python3 python3-pip git curl wget unzip golang \
+    netcat sqlmap hydra nmap exploitdb hashcat gobuster nikto \
+    john aircrack-ng wireshark metasploit-framework set beef-xss \
+    burpsuite maltego
+else
+  pkg update -y && pkg upgrade -y
+  pkg install python git curl wget -y
+  echo "⚠️ Tools penuh hanya optimal di Kali/Nethunter."
+fi
+
+# 2. Python dependencies
+pip3 install --upgrade pip
+pip3 install openai requests rich gradio
+
+# 3. Setup folder
+mkdir -p ~/Nikson471 && cd ~/Nikson471
+
+# 4. CLI recon script
+cat << 'EOF' > nikson471.py
+#!/usr/bin/env python3
+import os, openai, requests
+from rich.console import Console
+from rich.prompt import Prompt
+console = Console()
+def check():
+    k=os.getenv("OPENAI_API_KEY")
+    if not k:
+        k=Prompt.ask("[red]🎯 Masukkan OpenAI API Key[/red]")
+        os.environ["OPENAI_API_KEY"]=k
+    openai.api_key=os.getenv("OPENAI_API_KEY")
+def recon(d):
+    console.print(f"[cyan]🔍 Recon: {d}[/cyan]")
+    out=""
+    try: out += requests.get(f"https://api.hackertarget.com/hostsearch/?q={d}").text+"\n"
+    except: out+="[⚠️] Hostsearch fail\n"
+    try:
+        h=requests.get(f"https://{d}", timeout=5).headers
+        out+="\nHeaders:\n" + "\n".join(f"{i}: {h[i]}" for i in h)
+    except: out+="[⚠️] HTTPS Headers fail\n"
+    prompt=f"Recon output:\n{out}\nAnalisa potensi kerentanannya?"
+    try:
+        res=openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role":"system","content":"You are cybersecurity AI."},
+                      {"role":"user","content":prompt}]
+        )
+        console.print("[green]💡 AI Insight:[/green]")
+        console.print(res.choices[0].message.content)
+    except Exception as e:
+        console.print(f"[red]❌ GPT Error: {e}[/red]")
+if __name__=="__main__":
+    check()
+    tgt=Prompt.ask("🌐 Masukkan domain target")
+    recon(tgt)
+EOF
+chmod +x nikson471.py
+
+# 5. WebUI with Gradio
+cat << 'EOF' > nikson471_gui.py
+#!/usr/bin/env python3
+import os, openai, requests, gradio as gr
+def f(domain, key):
+    openai.api_key=key
+    out=""
+    try: out+=requests.get(f"https://api.hackertarget.com/hostsearch/?q={domain}").text+"\n"
+    except: out+="Hostsearch fail\n"
+    try:
+        h=requests.get(f"https://{domain}", timeout=5).headers
+        out+="\nHeaders:\n"+"\n".join(f"{i}: {h[i]}" for i in h)
+    except: out+="Headers fail\n"
+    prompt=f"Recon:\n{out}\nAnalisa potensi kerentanan?"
+    try:
+        res=openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role":"system","content":"You are cybersecurity AI."},
+                      {"role":"user","content":prompt}]
+        )
+        return res.choices[0].message.content
+    except Exception as e:
+        return f"GPT Error: {e}"
+gr.Interface(f, ["text","text"], "text",
+             title="Nikson471 AI OSINT WebUI").launch()
+EOF
+chmod +x nikson471_gui.py
+
+echo -e "\n✅ Full install done!"
+echo "👣 Use CLI: cd ~/Nikson471 && python3 nikson471.py"
+echo "🌐 WebUI: cd ~/Nikson471 && python3 nikson471_gui.py (then open http://127.0.0.1:7860)"
