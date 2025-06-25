@@ -1,0 +1,16 @@
+# 📱 Termux SMS Spammer Simple (2025)
+
+Tool Spam SMS Sederhana berbasis Python untuk Termux. Dirancang untuk pembelajaran & uji API dummy.
+
+pkg update && pkg install python git -y
+git clone https://github.com/icon471/termux-sms-tools
+cd termux-sms-tools
+python termux-sms-spam-simple.py
+
+termux-sms-tools/
+├── termux-sms-spam-simple.py     # Skrip utama spam SMS
+├── README.md                     # Dokumentasi cara pakai
+
+
+
+
